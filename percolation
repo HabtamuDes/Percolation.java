@@ -1,101 +1,133 @@
-public class Percolation {
-    private WeightedQuickUnionUF union;
-    private WeightedQuickUnionUF backwash;
-    private boolean[] openSites;
-    private final int SIZE, TOP_INDEX, BOTTOM_INDEX;
 
-    public Percolation(int size) {
-        int numNodes = size*size + 2;
-        union = new WeightedQuickUnionUF(numNodes);
-        backwash = new WeightedQuickUnionUF(numNodes);
-        openSites = new boolean[size*size];
-        SIZE = size;
-        TOP_INDEX = size * size;
-        BOTTOM_INDEX = size * size + 1;
+
+import edu.princeton.cs.algs4.In;
+import edu.princeton.cs.algs4.StdOut;
+import edu.princeton.cs.algs4.WeightedQuickUnionUF;
+
+public class Percolation {
+
+
+    private int n;
+
+    private WeightedQuickUnionUF uf;
+
+    private byte[][] open;
+
+    private int num;
+
+
+    public Percolation(int n) {
+        if (n <= 0) throw new IllegalArgumentException("Invalid input : n must > 0 !");
+        this.n = n + 1;
+        uf = new WeightedQuickUnionUF(this.n * this.n);
+        open = new byte[this.n][this.n];
     }
+
+    public static void main(String[] args) {
+        In in = new In(args[0]);
+        int n = in.readInt();
+        Percolation percolation = new Percolation(n);
+        boolean isPercolated = false;
+        int count = 0;
+        while (!in.isEmpty()) {
+            int row = in.readInt();
+            int col = in.readInt();
+            if (!percolation.isOpen(row, col)) {
+                count++;
+            }
+            percolation.open(row, col);
+            isPercolated = percolation.percolates();
+            if (isPercolated) {
+                break;
+            }
+        }
+        StdOut.println(count + " open sites");
+        if (isPercolated) {
+            StdOut.println("percolates");
+        } else {
+            StdOut.println("does not percolate");
+        }
+
+    }
+
+
+    private void validate(int row, int col) {
+        if (row <= 0 || row >= n) {
+            throw new IndexOutOfBoundsException("Invalid input : row index out of bounds !");
+        }
+        if (col <= 0 || row >= n) {
+            throw new IndexOutOfBoundsException("Invalid input : col index out of bounds !");
+        }
+    }
+
 
     public void open(int row, int col) {
-        assertInRange(row, col);
-        openSite(row, col);
-        connectToVirtualTopNode(row, col);
-        connectToAdjacents(row, col);
-        connectToVirtualBottomNode(row, col);
-    }
+        validate(row, col);
 
-    private void assertInRange(int row, int col) {
-        if (row < 1 || row > SIZE || col < 1 || col > SIZE) {
-            throw new IndexOutOfBoundsException();
-        }
-    }
+        if (isOpen(row, col)) return;
 
-    private void openSite(int row, int col) {
-        openSites[toIndex(row, col)] = true;
-    }
+        open[row][col] = 1;
+        num++;
 
-    private void connectToVirtualTopNode(int row, int col) {
+        if (row == n -1) open[row][col] = 2;
+
         if (row == 1) {
-            union(TOP_INDEX, toIndex(row, col));    }
-    }
+            uf.union(0, row * n + col);
 
-    private void union(int row, int col) {
-        union.union(row, col);
-        backwash.union(row, col);
-    }
+            if (open[row][col] == 2) open[0][0] = 2;
+        }
 
-    private int toIndex(int row, int col) {
-        return (row - 1) * SIZE + (col - 1);
-    }
+        if (row - 1 > 0 && isOpen(row - 1, col)) {
+            update(row - 1, col, row, col);
+        }
 
-    private void connectToAdjacents(int row, int col) {
-        connectTopNode(row, col);
-        connectBottomNode(row, col);
-        connectLeftNode(row, col);
-        connectRightNode(row, col);
-    }
+        if (row + 1 < n && isOpen(row + 1, col)) {
+            update(row + 1, col, row, col);
+        }
 
-    private void connectTopNode(int row, int col) {
-        if (row > 1 && isOpen(row - 1, col)) {
-            union(toIndex(row - 1, col), toIndex(row, col));
+        if (col - 1 > 0 && isOpen(row, col - 1)) {
+            update(row, col - 1, row, col);
+        }
+
+        if (col + 1 < n && isOpen(row, col + 1)) {
+            update(row, col + 1, row, col);
         }
     }
 
-    private void connectBottomNode(int row, int col) {
-        if (row < SIZE && isOpen(row + 1, col)) {
-            union(toIndex(row + 1, col), toIndex(row, col));
+
+    private void update(int i1, int j1, int i2, int j2) {
+        int p = uf.find(i1 * n + j1);
+        int q = uf.find(i2 * n + j2);
+        uf.union(i1 * n + j1, i2 * n + j2);
+
+        if (open[p / n][p % n] == 2 || open[q / n][q % n] == 2) {
+            int t = uf.find(i2 * n + j2);
+            open[t / n][t % n] = 2;
         }
     }
 
-    private void connectLeftNode(int row, int col) {
-        if (col > 1 && isOpen(row, col - 1)) {
-            union(toIndex(row, col - 1), toIndex(row, col));
-        }
-    }
-
-        private void connectRightNode(int row, int col) {
-        if (col < SIZE && isOpen(row, col + 1)) {
-            union(toIndex(row, col + 1), toIndex(row, col));
-        }
-    }
-
-    private void connectToVirtualBottomNode(int row, int col) {
-        if (row == SIZE) {
-            backwash.union(BOTTOM_INDEX, toIndex(row, col));
-        }
-    }
 
     public boolean isOpen(int row, int col) {
-        assertInRange(row, col);
-        return openSites[toIndex(row, col)];
+        validate(row, col);
+        return open[row][col] > 0;
     }
+
 
     public boolean isFull(int row, int col) {
-        assertInRange(row, col);
-        return union.connected(toIndex(row, col), TOP_INDEX);
+        validate(row, col);
+        return open[row][col] > 0 && uf.connected(0, row * n + col);
     }
+
+
+    public int numberOfOpenSites() {
+        return num;
+    }
+
 
     public boolean percolates() {
-        return backwash.connected(BOTTOM_INDEX, TOP_INDEX);
+        int root = uf.find(0);
+        return open[root / n][root % n] == 2;
     }
-}
-                                                                                                                                                                            69,8          58%
 
+
+}
